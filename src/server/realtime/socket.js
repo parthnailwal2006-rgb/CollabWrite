@@ -37,8 +37,13 @@ const log = createLogger('Socket');
  * @returns {import('socket.io').Server}
  */
 function attachSocketServer(httpServer, { store, engine }) {
+  const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:3000')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
   const io = new Server(httpServer, {
-    cors: { origin: process.env.CLIENT_ORIGIN || '*', credentials: true }
+    cors: { origin: allowedOrigins, credentials: true }
   });
 
   // The collaboration manager pushes here; it never touches io directly.

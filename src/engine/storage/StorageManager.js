@@ -35,9 +35,9 @@
 'use strict';
 
 const fs = require('fs');
-const path = require('path');
 
 const { Page } = require('./Page');
+const { openReadWrite } = require('./openFile');
 const { createLogger } = require('../../config/logger');
 
 const log = createLogger('StorageManager');
@@ -76,8 +76,7 @@ class StorageManager {
   /** Opens (creating if needed) documents.dat and loads the page directory. */
   open() {
     if (this.opened) return;
-    fs.mkdirSync(path.dirname(this.dataFile), { recursive: true });
-    this.fd = fs.openSync(this.dataFile, fs.existsSync(this.dataFile) ? 'r+' : 'w+');
+    this.fd = openReadWrite(this.dataFile);
     this.opened = true;
 
     const size = fs.fstatSync(this.fd).size;

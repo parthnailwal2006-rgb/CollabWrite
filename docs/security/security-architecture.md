@@ -84,10 +84,15 @@ than mitigating it.
 
 - `helmet()` sets the standard security headers, including a restrictive
   default Content-Security-Policy.
-- CORS is restricted to `CLIENT_ORIGIN`.
-- Rate limiting: 50 requests per 15 minutes per IP on `/api/auth/*`, 600 per
-  minute on the rest. Both are configurable and disabled under
-  `NODE_ENV=test`.
+- CORS is an **allowlist**, never a wildcard. `CLIENT_ORIGIN` may hold a
+  comma-separated list of origins; with no value set it falls back to
+  `http://localhost:3000`, not `*`. A permissive origin combined with
+  credentials would let any site drive the API with a victim's session.
+- Rate limiting is mounted on the `/api` prefix, so **every** API route is
+  covered rather than only the ones that write: a route that merely performs
+  an authorization check is still an oracle an attacker can hammer. 600
+  requests per minute per IP, with a tighter 50 per 15 minutes on
+  `/api/auth/*`. Both are configurable and disabled under `NODE_ENV=test`.
 - HTTPS is expected to be terminated by a reverse proxy in front of the
   application; the Node process speaks plain HTTP inside the network.
 

@@ -46,9 +46,10 @@ Tokens are HS256, signed with `JWT_SECRET`, and expire after
 `retryable: true` marks the errors a client may resubmit. 5xx bodies never
 include internal detail.
 
-**Rate limits.** 50 requests per 15 minutes per IP on the auth routes, 600
-per minute on the rest. Both are configurable and disabled under
-`NODE_ENV=test`.
+**Rate limits.** The limiter is mounted on the `/api` prefix, so every route
+below is covered: 600 requests per minute per IP, with a tighter 50 per 15
+minutes on `/api/auth/*`. Both are configurable (`API_RATE_LIMIT`,
+`AUTH_RATE_LIMIT`) and disabled under `NODE_ENV=test`.
 
 ---
 

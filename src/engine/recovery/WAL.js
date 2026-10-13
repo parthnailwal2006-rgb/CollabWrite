@@ -35,8 +35,8 @@
 'use strict';
 
 const fs = require('fs');
-const path = require('path');
 
+const { openReadWrite } = require('../storage/openFile');
 const { createLogger } = require('../../config/logger');
 
 const log = createLogger('WAL');
@@ -73,8 +73,7 @@ class WAL {
   /** Opens the log, creating it if absent, and restores the next LSN. */
   open() {
     if (this.opened) return;
-    fs.mkdirSync(path.dirname(this.walFile), { recursive: true });
-    this.fd = fs.openSync(this.walFile, fs.existsSync(this.walFile) ? 'r+' : 'w+');
+    this.fd = openReadWrite(this.walFile);
     this.opened = true;
 
     const records = this.readAll();

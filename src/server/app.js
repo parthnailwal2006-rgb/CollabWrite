@@ -30,7 +30,17 @@ function createApp({ store, engine }) {
   const app = express();
 
   app.use(helmet());
-  app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*', credentials: true }));
+
+  // CORS is an allowlist, never a wildcard. A permissive origin combined with
+  // credentials would let any site drive the API with a victim's session, so
+  // the fallback is the local dev origin rather than '*'. Several origins may
+  // be given as a comma-separated list.
+  const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:3000')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  app.use(cors({ origin: allowedOrigins, credentials: true }));
+
   app.use(express.json({ limit: '1mb' }));
 
   // Authentication is the one unauthenticated surface, so it gets its own
@@ -49,6 +59,12 @@ function createApp({ store, engine }) {
     legacyHeaders: false,
     skip: () => process.env.NODE_ENV === 'test'
   });
+
+  // Every /api route is rate limited, not only the ones that write. A route
+  // that merely performs an authorization check is still an oracle an
+  // attacker can hammer, so the limiter is mounted on the prefix rather than
+  // being remembered per route.
+  app.use('/api', apiLimiter);
 
   const auth = createAuthController({ store });
   const documents = createDocumentController({ store, engine });
@@ -73,7 +89,7 @@ function createApp({ store, engine }) {
   app.get('/api/auth/me', requireAuth, asyncHandler(auth.profile));
 
   // -------------------------------------------------------- documents
-  app.post('/api/documents', apiLimiter, requireAuth, asyncHandler(documents.create));
+  app.post('/api/documents', requireAuth, asyncHandler(documents.create));
   app.get('/api/documents', requireAuth, asyncHandler(documents.list));
   app.get('/api/documents/:id', requireAuth, asyncHandler(readAccess), asyncHandler(documents.read));
   app.patch('/api/documents/:id', requireAuth, asyncHandler(writeAccess), asyncHandler(documents.rename));
@@ -109,7 +125,6 @@ function createApp({ store, engine }) {
   // ------------------------------------------------------------ edits
   app.post(
     '/api/documents/:id/edit',
-    apiLimiter,
     requireAuth,
     asyncHandler(writeAccess),
     asyncHandler(edits.edit)
