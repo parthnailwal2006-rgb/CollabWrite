@@ -61,3 +61,9 @@ $RECYCLE.BIN/
 tmp/
 temp/
 scratch/
+
+# Academic Engine runtime data (documents.dat, wal.log, index.dat, metrics.log)
+data/
+*.dat
+wal.log
+metrics.log

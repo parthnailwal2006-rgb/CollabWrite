@@ -1,39 +1,58 @@
 {
   "name": "collabwrite",
-  "version": "1.0.0",
-  "description": "Real-Time Collaborative Document Editor with Operational Transformation & 2PL Deadlock Detection",
-  "main": "src/services/OTEngine.js",
+  "version": "2.0.0",
+  "description": "Real-Time Collaborative Document Editor built on a custom OS/DBMS educational engine: request scheduling, two-phase locking with deadlock detection, ACID transactions, buffer pool, B+-Tree indexing and write-ahead logging",
+  "main": "src/server/index.js",
   "scripts": {
-    "build": "echo 'CollabWrite build completed'",
-    "dev": "node src/services/OTEngine.js",
-    "start": "node src/services/OTEngine.js",
-    "lint": "eslint src/ tests/ --ext .js",
+    "start": "node src/server/index.js",
+    "dev": "nodemon src/server/index.js",
+    "build": "echo 'CollabWrite is a plain Node.js project; no build step is required'",
+    "lint": "eslint src/ tests/ scripts/ vite.config.js --ext .js,.jsx",
     "test": "jest --runInBand",
-    "test:ot": "jest tests/unit/ot.test.js tests/property/ot_invariants.test.js",
-    "test:deadlocks": "jest tests/unit/deadlock.test.js",
+    "test:coverage": "jest --runInBand --coverage",
+    "test:storage": "jest tests/unit/storage.test.js tests/unit/bufferPool.test.js",
+    "test:transactions": "jest tests/unit/transaction.test.js",
+    "test:locks": "jest tests/unit/lockManager.test.js tests/unit/deadlockDetector.test.js",
+    "test:scheduler": "jest tests/unit/scheduler.test.js tests/unit/messaging.test.js",
+    "test:index": "jest tests/unit/index.test.js",
+    "test:recovery": "jest tests/unit/recovery.test.js",
+    "test:integration": "jest tests/integration --runInBand",
+    "demo": "node scripts/demos/run-all.js",
+    "demo:concurrency": "node scripts/demos/concurrency-demo.js",
+    "demo:deadlock": "node scripts/demos/deadlock-demo.js",
+    "demo:transactions": "node scripts/demos/transaction-demo.js",
+    "demo:recovery": "node scripts/demos/recovery-demo.js",
+    "demo:index": "node scripts/demos/index-benchmark.js",
+    "demo:scheduling": "node scripts/demos/scheduling-demo.js",
+    "demo:buffer": "node scripts/demos/buffer-pool-demo.js",
     "changelog": "node scripts/generate-changelog.js",
     "docker:up": "docker-compose up -d --build",
     "docker:down": "docker-compose down",
     "db:init": "psql -U collabuser -d collabwrite -f database/init.sql",
-    "db:seed": "psql -U collabuser -d collabwrite -f database/seeds/001_sample_data.sql"
+    "db:seed": "psql -U collabuser -d collabwrite -f database/seeds/001_sample_data.sql",
+    "client:dev": "vite",
+    "client:build": "vite build",
+    "client:preview": "vite preview"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/purvanshjoshi/CollabWrite.git"
   },
   "keywords": [
-    "operational-transformation",
-    "collaborative-editor",
-    "real-time",
-    "deadlock-detection",
-    "concurrency-control",
-    "two-phase-locking",
-    "postgresql",
-    "write-ahead-logging",
-    "socketio",
-    "react",
     "operating-systems",
-    "dbms"
+    "dbms",
+    "two-phase-locking",
+    "deadlock-detection",
+    "wait-for-graph",
+    "acid-transactions",
+    "write-ahead-logging",
+    "crash-recovery",
+    "buffer-pool",
+    "lru-replacement",
+    "b-plus-tree",
+    "request-scheduling",
+    "message-passing",
+    "collaborative-editor"
   ],
   "author": "CollabWrite Development Team",
   "license": "MIT",
@@ -41,27 +60,50 @@
     "url": "https://github.com/purvanshjoshi/CollabWrite/issues"
   },
   "homepage": "https://github.com/purvanshjoshi/CollabWrite#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "src/engine/**/*.js",
+      "src/server/**/*.js",
+      "!src/server/index.js"
+    ],
+    "coverageThreshold": {
+      "src/engine/": {
+        "statements": 80,
+        "branches": 70,
+        "functions": 80,
+        "lines": 80
+      }
+    }
+  },
   "dependencies": {
-    "async-lock": "^1.4.1",
-    "bcrypt": "^6.0.0",
+    "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
-    "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "express-rate-limit": "^8.6.2",
-    "helmet": "^8.3.0",
-    "ioredis": "^6.0.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.3.1",
+    "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "knex": "^3.1.0",
     "pg": "^8.12.0",
-    "prom-client": "^15.1.3",
-    "socket.io": "^4.7.5",
-    "winston": "^3.13.0"
+    "socket.io": "^4.7.5"
   },
   "devDependencies": {
-    "@types/jest": "^30.0.0",
-    "eslint": "^10.9.1",
-    "jest": "^30.4.2",
+    "@types/jest": "^29.5.12",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.37.2",
+    "jest": "^29.7.0",
     "nodemon": "^3.1.4",
-    "supertest": "^7.0.0"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "socket.io-client": "^4.7.5",
+    "supertest": "^7.0.0",
+    "vite": "^5.4.11"
   }
 }

@@ -14,18 +14,17 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
 
 1. **Reporting Bugs**: File detailed issues using the Bug Report template.
 2. **Suggesting Enhancements**: Submit feature requests with clear use cases and architectural rationale.
-3. **Algorithm Improvements**: Optimize Operational Transformation (OT) or Deadlock Detection routines.
+3. **Algorithm Improvements**: Improve the engine's algorithms - page replacement, lock scheduling, deadlock detection, B+-Tree balancing or recovery.
 4. **Documentation**: Improve guides, fix typos, add interactive architecture diagrams, or expand educational OS/DBMS explanations.
-5. **Writing Tests**: Add unit tests for edge cases in OT, stress test race conditions, or test transaction rollbacks.
+5. **Writing Tests**: Add edge cases to the B+-Tree property test, stress concurrent transactions, or extend the crash-recovery scenarios.
 
 ---
 
 ## Development Setup
 
 ### Prerequisites
-- **Node.js**: `v18.x` or `v20.x` LTS
-- **PostgreSQL**: `v14+` or `v15+`
-- **Redis**: `v7.x` (optional for local standalone, required for multi-node testing)
+- **Node.js**: `v22.x` or newer (CI runs v26)
+- **PostgreSQL**: `v14+` (optional - set `STORE_DRIVER=memory` to run without it)
 - **Docker & Docker Compose**: Recommended for local environment setup
 
 ### Local Installation
@@ -41,9 +40,9 @@ By participating in this project, you agree to abide by our [Code of Conduct](CO
    cp .env.example .env
    ```
 
-3. **Start PostgreSQL & Redis via Docker:**
+3. **Start PostgreSQL via Docker** (skip if using `STORE_DRIVER=memory`)**:**
    ```bash
-   docker-compose up -d postgres redis
+   docker compose up -d postgres
    ```
 
 4. **Initialize Database Schema:**
@@ -91,7 +90,7 @@ We adhere strictly to [Conventional Commits](https://www.conventionalcommits.org
 ```
 
 ### Allowed Types:
-- `feat`: A new feature (e.g., `feat(ot): add support for rich text attribute transformations`)
+- `feat`: A new feature (e.g., `feat(index): add range scan to the B+-Tree`)
 - `fix`: A bug fix (e.g., `fix(locks): resolve deadlock when releasing expired write locks`)
 - `docs`: Documentation changes only (e.g., `docs(readme): update deployment guide`)
 - `style`: Formatting, missing semicolons, whitespace (no code change)
@@ -110,11 +109,19 @@ Before opening a Pull Request, make sure all tests pass:
 # Run unit tests
 npm test
 
-# Run OT Engine property tests
-npm run test:ot
+# Run with the coverage gate (80% over src/engine)
+npm run test:coverage
 
-# Run deadlock detection simulation
-npm run test:deadlocks
+# Per-module subsets
+npm run test:storage      # Phases 3-4: pages, storage, buffer pool
+npm run test:transactions # Phase 5
+npm run test:locks        # Phase 6: locking and deadlock detection
+npm run test:scheduler    # Phases 7-8: scheduling and messaging
+npm run test:index        # Phase 10: B+-Tree property tests
+npm run test:recovery     # Phase 11: WAL and crash recovery
+
+# The evaluation demos: each asserts its own outcome
+npm run demo
 
 # Run linter
 npm run lint

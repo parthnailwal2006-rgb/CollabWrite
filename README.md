@@ -1,233 +1,224 @@
-<div align="center">
-
 # CollabWrite
 
-### Real-Time Collaborative Document Editor with Operational Transformation
+A real-time collaborative document editor whose concurrency control,
+persistence, indexing and crash recovery are implemented from first
+principles rather than delegated to a database.
 
-[![CI](https://img.shields.io/badge/CI-Passing-brightgreen.svg)](https://github.com/purvanshjoshi/CollabWrite/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Node.js](https://img.shields.io/badge/Node.js-v20.x-green.svg)](https://nodejs.org/)
-[![React](https://img.shields.io/badge/React-18.x-61dafb.svg)](https://reactjs.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15.x-336791.svg)](https://www.postgresql.org/)
-[![Redis](https://img.shields.io/badge/Redis-7.x-dc382d.svg)](https://redis.io/)
-[![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen.svg)](CONTRIBUTING.md)
+Multiple people edit one document at once. Behind the editor, a request
+scheduler queues their edits, a worker pool runs them, two-phase locking
+serialises them, a write-ahead log makes them durable, a buffer pool caches
+the pages involved, and a B+-Tree indexes the result. Those mechanisms are
+the project; the editor is how you watch them work.
 
-*An enterprise-grade, transparent, and resilient real-time co-authoring platform uniting advanced **Operating Systems** concurrency with **Database Management Systems** ACID transactions.*
-
-[Architecture](#system-architecture) &bull; [OS and DBMS Concepts](#os-and-dbms-concept-mapping) &bull; [Quick Start](#quick-start) &bull; [OT Algorithm](#operational-transformation-ot) &bull; [Documentation](#documentation-index)
-
----
-
-</div>
-
-## Overview
-
-**CollabWrite** addresses the fundamental challenge of multi-user concurrent document co-authoring without reliance on closed-source algorithms. Combining a mathematically proven **Operational Transformation (OT)** engine with **Two-Phase Locking (2PL)** and **Write-Ahead Logging (WAL)** on PostgreSQL, CollabWrite guarantees sub-100ms edit propagation, zero data loss, and deterministic convergence across all distributed clients.
-
----
-
-## Core Capabilities
-
-- **Real-Time Operational Transformation:** Client-side optimistic rendering with automatic, transparent server-side linearization and transformation.
-- **Deadlock Detection and Concurrency Control:** Graph-based cycle detection on dynamic Wait-For Graphs (Tarjan's and DFS cycle detection) with automatic victim resolution.
-- **ACID Persistence and Crash Recovery:** Robust PostgreSQL schema with Write-Ahead Logging (`change_logs`), point-in-time version snapshotting, and automatic REDO replay on startup.
-- **Multi-User Presence and Live Cursors:** Real-time remote cursor positioning, active text selection highlighting, and user connectivity indicators.
-- **Enterprise Security and RBAC:** Granular 3-tier Role-Based Access Control (`viewer`, `editor`, `owner`), JWT access and refresh token rotation, and strict input sanitization against XSS and SQL injection.
-- **Threaded Inline Discussions:** Character offset-based commenting system with real-time replies and resolution tracking.
-- **Production Architecture:** Fully containerized Docker Compose environment with health checks and horizontal scaling via Redis Pub/Sub.
-
----
-
-## System Architecture
-
-```mermaid
-graph TD
-    subgraph Clients [Web Clients - React and Local OT Engine]
-        ClientA[User A - Client]
-        ClientB[User B - Client]
-        ClientC[User C - Client]
-    end
-
-    subgraph LoadBalancer [Reverse Proxy and Gateway]
-        Nginx[Nginx Gateway and SSL]
-    end
-
-    subgraph AppServer [Application Tier - Node.js and Express]
-        WSServer[Socket.io Real-Time Server]
-        RESTServer[Express REST API]
-        OTEngine[Server OT Engine]
-        LockManager[Lock Manager and 2PL Engine]
-        DeadlockDetector[Deadlock Detector - Wait-For Graph]
-        TxCoord[Transaction Coordinator]
-    end
-
-    subgraph DataTier [Data and Caching Tier]
-        Postgres[(PostgreSQL 15+ DB and WAL)]
-        Redis[(Redis 7+ Pub/Sub Adapter)]
-    end
-
-    Clients <-->|WSS / HTTPS| Nginx
-    Nginx <--> WSServer
-    Nginx <--> RESTServer
-    WSServer <--> OTEngine
-    WSServer <--> LockManager
-    LockManager <--> DeadlockDetector
-    OTEngine <--> TxCoord
-    TxCoord <--> Postgres
-    WSServer <--> Redis
+```
+Tests   190 passing, 14 suites
+Engine coverage   93% statements, 78% branches
+Demos   7, each asserting its own outcome in CI
 ```
 
 ---
 
-## OS and DBMS Concept Mapping
+## Why it is built this way
 
-CollabWrite serves as a real-world educational bridge between Operating Systems and Database Systems:
+PostgreSQL could provide every one of those guarantees in a few lines of
+SQL. That is exactly what `rules.md` forbids: calling `BEGIN` is not
+implementing a transaction manager, and a `SELECT ... FOR UPDATE` is not a
+lock manager. So the engine owns them, and PostgreSQL is confined to user
+accounts, document metadata, permissions and audit logs.
 
-| Concept Domain | Academic Principle | CollabWrite Production Implementation |
-| :--- | :--- | :--- |
-| **OS** | **Mutual Exclusion (Mutex)** | In-memory document-level locks (`async-lock`) serializing critical OT transformation sections |
-| **OS** | **Counting Semaphores** | Database client connection pooling managing concurrent transactions |
-| **OS** | **Deadlock Detection** | Directed Wait-For Graph $G=(V,E)$ cycle analysis via DFS with victim preemption |
-| **OS** | **Two-Phase Locking (2PL)** | Strict growing and shrinking phases during multi-paragraph reservation |
-| **OS** | **Thread Pool and Async I/O** | Non-blocking event loop offloading intensive crypto and DB queries to Libuv workers |
-| **DBMS** | **Atomicity and Consistency** | Transactional blocks (`BEGIN ... COMMIT`) wrapping document mutation, version increment, and WAL logging |
-| **DBMS** | **Isolation Levels** | `SERIALIZABLE` and `READ COMMITTED` transactions preventing dirty and phantom reads |
-| **DBMS** | **Write-Ahead Logging (WAL)** | Append-only `change_logs` table guaranteeing durability and full crash recovery |
-| **DBMS** | **B+ Tree Indexing** | Composite indexing on `(document_id, server_version ASC)` for $O(\log N)$ historical range scans |
-| **DBMS** | **Triggers and Stored Procedures** | PL/pgSQL triggers maintaining word counts, character lengths, and comment counters |
+The boundary is enforced, not merely documented: CI queries
+`information_schema` after applying the schema and fails the build if a
+`document_versions`, `change_logs` or `document_locks` table — or a
+`content` column on `documents` — reappears.
 
 ---
 
-## Operational Transformation (OT)
+## Quick start
 
-Given two concurrent operations $O_1$ and $O_2$ executed against initial state $S$:
-
-$$\text{apply}(\text{apply}(S, O_1), O_2') = \text{apply}(\text{apply}(S, O_2), O_1')$$
-
-```
-          S
-        /   \
-    O1 /     \ O2
-      v       v
-     S1       S2
-      |       |
-  O2' |       | O1'
-      v       v
-         S'   <--- Deterministic Convergence
-```
-
-- **Insert vs. Insert:** Position adjusted by content length with deterministic user ID tie-breaking.
-- **Insert vs. Delete:** Insertion point offset or clamped relative to deletion ranges.
-- **Delete vs. Delete:** Overlapping intervals clipped to prevent duplicate deletions.
-
----
-
-## Quick Start
-
-### Prerequisites
-- [Docker](https://www.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) installed.
-- (Optional for standalone manual setup): Node.js 20+ and PostgreSQL 15+.
-
-### 1. Clone and Configure
 ```bash
 git clone https://github.com/purvanshjoshi/CollabWrite.git
 cd CollabWrite
-cp .env.example .env
+npm install
+cp .env.example .env     # set JWT_SECRET to a long random value
 ```
 
-### 2. Launch with Docker Compose
-```bash
-docker-compose up -d --build
-```
-
-### 3. Service Access Points
-- **Frontend React Application:** [http://localhost:3000](http://localhost:3000)
-- **Backend REST API & WebSockets:** [http://localhost:3001](http://localhost:3001)
-- **PostgreSQL Database:** `localhost:5432` (`collabwrite` / `collabuser`)
-- **Redis Pub/Sub:** `localhost:6379`
-
----
-
-## Repository Structure
-
-```
-CollabWrite/
-├── .github/                       # GitHub Actions workflows and templates
-│   ├── workflows/
-│   │   ├── ci.yml                 # Continuous integration pipeline
-│   │   └── release.yml            # Semantic release automation
-│   ├── ISSUE_TEMPLATE/            # Bug report and feature request templates
-│   └── pull_request_template.md   # Standardized PR template
-├── database/                      # Relational schema and migration scripts
-│   ├── init.sql                   # Production PostgreSQL DDL (10 tables, triggers, views)
-│   └── seeds/
-│       └── 001_sample_data.sql    # Development seed dataset
-├── docs/                          # Comprehensive technical documentation
-│   ├── SPECIFICATION.md           # Master Project Specification (17 sections)
-│   ├── architecture/              # System architecture and OS/DBMS deep-dives
-│   ├── algorithms/                # OT mathematical proofs and Deadlock detection
-│   ├── api/                       # REST API and WebSocket protocol specifications
-│   ├── workflows/                 # User flows and sequence diagrams
-│   ├── security/                  # RBAC matrix and threat modeling
-│   ├── deployment/                # Docker, Kubernetes, and Nginx configurations
-│   ├── testing/                   # Property testing and concurrency stress suite
-│   └── monitoring/                # Prometheus KPIs, health checks, and runbooks
-├── .editorconfig                  # Editor formatting rules
-├── .env.example                   # Environment configuration template
-├── .gitignore                     # Git exclusion rules
-├── CHANGELOG.md                   # Version release notes
-├── CODE_OF_CONDUCT.md             # Contributor Covenant Code of Conduct
-├── CONTRIBUTING.md                 # Development and PR guidelines
-├── docker-compose.yml             # Container orchestration configuration
-├── LICENSE                        # MIT License
-├── README.md                      # Project front-page overview
-└── SECURITY.md                    # Vulnerability reporting policy
-```
-
----
-
-## Documentation Index
-
-- **[Master Project Specification](docs/SPECIFICATION.md)**: Full 17-section definitive project specification.
-- **[System Architecture](docs/architecture/system-architecture.md)**: Tier breakdown, state machines, and scaling.
-- **[OS and DBMS Concepts](docs/architecture/os-dbms-concepts.md)**: Theoretical mappings to production code.
-- **[Database Schema and Indices](docs/architecture/database-schema.md)**: ER diagrams, performance indices, and triggers.
-- **[Operational Transformation Guide](docs/algorithms/operational-transformation.md)**: Transformation matrix and cursor algorithms.
-- **[Deadlock Detection](docs/algorithms/deadlock-detection.md)**: Two-Phase Locking and Wait-For Graph cycle detection.
-- **[REST API Reference](docs/api/rest-api.md)**: 20+ endpoints with request and response payloads.
-- **[WebSocket Protocol](docs/api/websocket-protocol.md)**: Event definitions, payloads, and heartbeat rules.
-- **[User Workflows](docs/workflows/user-workflows.md)**: End-to-end sequence flows for co-authoring and recovery.
-- **[Security Architecture](docs/security/security-architecture.md)**: RBAC enforcement, XSS defense, and audit logging.
-- **[Deployment and Kubernetes](docs/deployment/docker-and-k8s.md)**: Containerization, K8s manifests, and Nginx SSL.
-- **[Testing Strategy](docs/testing/testing-strategy.md)**: Property-based fuzzing and stress testing.
-- **[Monitoring and Maintenance](docs/monitoring/monitoring-and-maintenance.md)**: Prometheus metrics, SLOs, and backup runbooks.
-
----
-
-## Testing and Verification
+**Without a database** — the in-memory support store is enough to run
+everything:
 
 ```bash
-# Run unit and integration tests
-npm test
+STORE_DRIVER=memory npm run dev     # API and WebSocket on :3001
+npm run client:dev                  # editor on :3000
+```
 
-# Run OT Property (TP1 Invariant) Fuzzing
-npm run test:ot
+**With PostgreSQL:**
 
-# Run Concurrency and Deadlock Stress Simulations
-npm run test:deadlocks
+```bash
+npm run db:init && npm run db:seed
+npm run dev
+```
 
-# Lint and Code Style Check
-npm run lint
+**With Docker:**
+
+```bash
+npm run docker:up        # frontend :3000, backend :3001, postgres :5432
+```
+
+### See it work
+
+```bash
+npm test                 # the whole suite
+npm run demo             # all seven evaluation demos
+npm run demo:deadlock    # or just one
 ```
 
 ---
+
+## The engine
+
+| Module | OS/DBMS concept | Source |
+|--------|-----------------|--------|
+| Storage Manager | Page I/O, file organisation, CRC-32 | [`src/engine/storage/`](src/engine/storage/) |
+| Buffer Pool | Memory management, LRU, pin counts | [`src/engine/buffer/`](src/engine/buffer/) |
+| Transaction Manager | ACID, STEAL/FORCE buffer policy | [`src/engine/transaction/`](src/engine/transaction/) |
+| Lock Manager | Two-phase locking, S/X modes, fair queueing | [`src/engine/lock/LockManager.js`](src/engine/lock/LockManager.js) |
+| Deadlock Detector | Wait-for graph, Tarjan's SCC | [`src/engine/lock/DeadlockDetector.js`](src/engine/lock/DeadlockDetector.js) |
+| Request Scheduler | FIFO and round-robin scheduling | [`src/engine/scheduler/Scheduler.js`](src/engine/scheduler/Scheduler.js) |
+| Worker Pool | Threads, bounded concurrency | [`src/engine/scheduler/WorkerPool.js`](src/engine/scheduler/WorkerPool.js) |
+| Message Queue | Producer-consumer, FIFO per document | [`src/engine/messaging/`](src/engine/messaging/) |
+| Conflict Resolver | Optimistic concurrency control | [`src/engine/conflict/`](src/engine/conflict/) |
+| Index Manager | B+-Tree inverted index | [`src/engine/index/`](src/engine/index/) |
+| Recovery Manager | Write-ahead logging, REDO/UNDO | [`src/engine/recovery/`](src/engine/recovery/) |
+
+Each is explained in the six-step format — concept, data structures,
+algorithm, implementation, test, result — in
+**[`docs/engine/README.md`](docs/engine/README.md)**.
+
+### The path of one edit
+
+```
+POST /api/documents/7/edit
+  -> auth + role check          (an unauthorised edit never takes a lock)
+  -> Scheduler queue            (waiting time recorded)
+  -> Worker                     (concurrency bounded by the pool)
+  -> TransactionManager.begin   (WAL BEGIN)
+  -> LockManager                (X locks, ascending page order)
+  -> ConflictResolver           (baseVersion vs current -> 409 on a mismatch)
+  -> BufferPool                 (hit, or read through the Storage Manager)
+  -> WAL.logUpdate              (before- and after-image, BEFORE the page changes)
+  -> commit                     (COMMIT fsync'd, pages flushed, locks released)
+  -> IndexManager, MessageQueue (after the commit; an abort must not broadcast)
+  -> Socket.IO                  (every client on the document)
+```
+
+---
+
+## Measured results
+
+From `npm run demo`, not from estimates.
+
+**Index versus full scan**, 150 documents:
+
+| Keyword | Indexed | Full scan | Speed-up |
+|---------|---------|-----------|----------|
+| `semaphoreinversion` | 0.09 ms | 25.9 ms | 281x |
+| `recovery` | 0.13 ms | 27.4 ms | 209x |
+| `scheduling` | 0.04 ms | 29.0 ms | 781x |
+
+**Scheduling policies**, 16 requests bursting onto one document while six
+others send one each:
+
+| Policy | Mean wait (all) | Mean wait (non-burst documents) |
+|--------|-----------------|---------------------------------|
+| FIFO | 82 ms | 146 ms |
+| Round-robin | 78 ms | 23 ms |
+
+Round-robin redistributes waiting rather than reducing it — total
+throughput is unchanged, because the work is.
+
+**Buffer pool**, 4 frames: hit ratio 0.90 when the working set fits, 0.00
+for a cyclic scan over 9 pages. The second number is the textbook worst case
+for LRU, and the demo shows it rather than hiding it.
+
+**Crash recovery**: commit two edits, write a third transaction, force its
+dirty page to disk, kill the process. After restart the committed text is
+intact, the uncommitted text is gone, and the recovery report names the
+winners, the losers and the page counts.
+
+---
+
+## Honest limitations
+
+| Limitation | Why |
+|------------|-----|
+| **No Operational Transformation.** Concurrent edits to the same document serialise; a stale edit gets a 409 and the client rebases automatically. | `design.md` section 10. 2PL plus version checks is correct; OT buys convenience, and a subtly wrong OT engine corrupts documents. |
+| **Edits to one document do not run in parallel.** An edit locks every page of its document, in ascending order. | An insert near the start shifts every later chunk. The ordering makes the edit path deadlock-free by construction; the cost is intra-document concurrency. |
+| **The backend is single-instance.** Two processes on one data directory would corrupt it. | The lock table, buffer pool and WAL writer are in-process. See [`docs/deployment/`](docs/deployment/docker-and-k8s.md) section 1. |
+| **The WAL is never truncated**, so it grows and recovery time grows with it. | `design.md` section 12 lists checkpoint truncation as a future improvement. |
+| **Pages are not reclaimed** after a document is deleted. | Reclaiming needs a free-space map, which the design does not specify. An unreferenced chain is inert. |
+| **Workers are not OS threads.** | They are explicit objects with an IDLE/BUSY state machine on the event loop. Real threads cannot share the lock table and buffer pool without routing every page through IPC, which would hide the mechanisms this project exists to show. Recorded as a trade-off, not glossed over. |
+
+Further gaps are listed in
+[`docs/testing/testing-strategy.md`](docs/testing/testing-strategy.md)
+section 8 and
+[`docs/security/security-architecture.md`](docs/security/security-architecture.md)
+section 6.
+
+---
+
+## Documentation
+
+The authoritative specification is the five documents at the repository
+root: [`prd.md`](prd.md), [`architecture.md`](architecture.md),
+[`design.md`](design.md), [`phases.md`](phases.md), [`rules.md`](rules.md).
+
+Implementation documentation is indexed in
+[`docs/SPECIFICATION.md`](docs/SPECIFICATION.md). The most useful entry
+points:
+
+- [Engine modules, six-step explanations](docs/engine/README.md)
+- [System architecture](docs/architecture/system-architecture.md)
+- [OS/DBMS traceability matrix](docs/architecture/os-dbms-concepts.md)
+- [REST API](docs/api/rest-api.md) and [WebSocket protocol](docs/api/websocket-protocol.md)
+- [Testing strategy](docs/testing/testing-strategy.md)
+
+---
+
+## Project layout
+
+```
+prd.md architecture.md design.md phases.md rules.md   governing specification
+src/engine/      the eleven academic modules + Engine.js composition root
+src/server/      Express, Socket.IO, controllers, middleware, support stores
+src/client/      React editor
+database/        PostgreSQL support schema and seed data
+scripts/demos/   seven evaluation demos, each asserting its own outcome
+tests/           unit, integration and property tests
+docs/            implementation documentation
+```
+
+## Scripts
+
+| Command | Purpose |
+|---------|---------|
+| `npm start` / `npm run dev` | Run the API and WebSocket server |
+| `npm run client:dev` / `client:build` | React editor |
+| `npm test` / `test:coverage` | Full suite, with the coverage gate |
+| `npm run test:locks`, `test:recovery`, … | Per-phase test subsets |
+| `npm run demo` | All seven evaluation demos |
+| `npm run db:init` / `db:seed` | Apply the PostgreSQL schema and seed data |
+| `npm run docker:up` / `docker:down` | Full stack |
+| `npm run lint` | ESLint over server, client, tests and scripts |
+
+Configuration is documented inline in [`.env.example`](.env.example); every
+engine setting maps to a decision recorded in `design.md`.
 
 ## Contributing
 
-Contributions are welcomed. Please review the [Contributing Guidelines](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) prior to opening pull requests.
-
----
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). `rules.md` applies to every
+change: an academic mechanism must be explained in six steps before it is
+implemented, and must not be satisfied by calling a library that already
+does it.
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+[MIT](LICENSE)

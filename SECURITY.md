@@ -19,7 +19,7 @@ We take the security of CollabWrite seriously. If you discover a security vulner
    - Type of issue (e.g., buffer overflow, SQL injection, privilege escalation, timing attack)
    - Step-by-step instructions to reproduce the vulnerability
    - Proof-of-concept (PoC) scripts or HTTP/WebSocket payload examples
-   - Potential impact and affected components (e.g., Lock Manager, OT Engine, Auth Middleware)
+   - Potential impact and affected components (e.g., Lock Manager, Recovery Manager, Auth Middleware)
    - Any suggested mitigations or patches
 
 ### Response Timeline
