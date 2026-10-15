@@ -153,6 +153,11 @@ export default function App() {
   const [participants, setParticipants] = useState([]);
   const [status, setStatus] = useState({ kind: 'idle', message: 'Ready' });
 
+  const [sharingOpen, setSharingOpen] = useState(false);
+  const [shareUsername, setShareUsername] = useState('');
+  const [shareRole, setShareRole] = useState('editor');
+  const [shareStatus, setShareStatus] = useState('');
+
   const socketRef = useRef(null);
   // The last text the server is known to hold, and the version it was at.
   // Operations are diffed against this, never against the previous keystroke.
@@ -259,6 +264,25 @@ export default function App() {
     }
   }, [text, session, openDocument]);
 
+  const handleShare = async (event) => {
+    event.preventDefault();
+    const current = activeRef.current;
+    if (!current || !shareUsername.trim()) return;
+
+    try {
+      await api(`/api/documents/${current.id}/permissions`, {
+        token: session.token,
+        method: 'PUT',
+        body: { username: shareUsername.trim(), role: shareRole }
+      });
+      setShareStatus(`Shared with @${shareUsername.trim()} as ${shareRole}`);
+      setShareUsername('');
+      setTimeout(() => setShareStatus(''), 4000);
+    } catch (error) {
+      setShareStatus(`Failed: ${error.message}`);
+    }
+  };
+
   useEffect(() => {
     if (!active) return undefined;
     if (text === committedRef.current.text) return undefined;
@@ -310,11 +334,37 @@ export default function App() {
               <div className="editor-header">
                 <h2>{active.title}</h2>
                 <span className="version">version {committedRef.current.version}</span>
+                {active.role === 'owner' && (
+                  <button
+                    type="button"
+                    onClick={() => setSharingOpen(!sharingOpen)}
+                    style={{ fontSize: '0.8rem', padding: '0.25rem 0.6rem' }}
+                  >
+                    {sharingOpen ? 'Close Share' : 'Share'}
+                  </button>
+                )}
                 <span className="spacer" />
                 <span className="participants">
                   {participants.length} online: {participants.map((p) => p.username).join(', ') || '-'}
                 </span>
               </div>
+
+              {sharingOpen && active.role === 'owner' && (
+                <form className="share-panel" onSubmit={handleShare}>
+                  <input
+                    placeholder="Enter collaborator username"
+                    value={shareUsername}
+                    onChange={(e) => setShareUsername(e.target.value)}
+                    required
+                  />
+                  <select value={shareRole} onChange={(e) => setShareRole(e.target.value)}>
+                    <option value="editor">Editor (Can edit)</option>
+                    <option value="viewer">Viewer (Read-only)</option>
+                  </select>
+                  <button type="submit" className="primary">Grant Access</button>
+                  {shareStatus && <span className="share-feedback">{shareStatus}</span>}
+                </form>
+              )}
 
               <textarea
                 value={text}
