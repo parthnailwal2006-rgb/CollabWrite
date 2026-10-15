@@ -25,5 +25,10 @@ export default defineConfig({
       '/api': { target: process.env.VITE_API_URL || 'http://localhost:3001', changeOrigin: true },
       '/socket.io': { target: process.env.VITE_API_URL || 'http://localhost:3001', ws: true }
     }
+  },
+  resolve: {
+    alias: {
+      'socket.io-client': 'socket.io-client/dist/socket.io.js'
+    }
   }
 });
