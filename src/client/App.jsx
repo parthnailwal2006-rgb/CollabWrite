@@ -18,7 +18,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 
-import { api, applyOperation, diffToOperations } from './api.js';
+import { api, applyOperation, diffToOperations } from './clientApi.js';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || undefined;
 const FLUSH_DELAY_MS = 350;
