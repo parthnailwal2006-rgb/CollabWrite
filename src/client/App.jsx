@@ -287,9 +287,9 @@ function InspectorModal({ token, onClose }) {
         </div>
 
         <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1 }}>
-          {error && (
+          {error && !data && (
             <div style={{ background: '#7f1d1d', border: '1px solid #ef4444', color: '#fecaca', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.82rem' }}>
-              ⚠️ <strong>Backend Restart Required:</strong> The backend server process needs to be restarted to load the new Inspector route. Please stop the backend server (<code>Ctrl+C</code>) in your terminal and run <code>npm start</code> again.
+              ⚠️ <strong>Connection Notice:</strong> Unable to connect to backend on port 3001 ({error}). Please ensure server is running.
             </div>
           )}
           {tab === 'purvansh' && (
