@@ -90,7 +90,7 @@ function generateChangelog() {
 
     const header = '# Changelog\n\nAll notable changes to the **CollabWrite** project are documented in this file.\n\nThe format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n---\n\n';
 
-    let body = currentContent.replace(/^# Changelog[\s\S]*?---\s*\n*/i, '');
+    const body = currentContent.replace(/^# Changelog[\s\S]*?---\s*\n*/i, '');
 
     if (!body.includes(newSection.trim())) {
       const updated = header + newSection + body;

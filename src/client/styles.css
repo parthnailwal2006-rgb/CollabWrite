@@ -1,0 +1,189 @@
+/**
+ * CollabWrite - Editor styling.
+ *
+ * rules.md section 1 puts UI polish behind the academic objectives, so this
+ * stylesheet aims at legibility during a demo rather than visual ambition:
+ * clear state colours, a readable monospace editing surface, and a status
+ * line that makes the engine's answer visible.
+ */
+
+:root {
+  --bg: #11151c;
+  --panel: #1a212b;
+  --panel-raised: #222b38;
+  --border: #2d3846;
+  --text: #e6edf3;
+  --muted: #8b98a9;
+  --accent: #4c8dff;
+  --ok: #3fb950;
+  --warn: #d29922;
+  --error: #f85149;
+  --remote: #a371f7;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel-raised);
+  color: var(--text);
+  padding: 0.45rem 0.8rem;
+}
+
+button:hover { border-color: var(--accent); }
+button:disabled { opacity: 0.6; cursor: progress; }
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+input, textarea {
+  font: inherit;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.5rem 0.65rem;
+}
+
+input:focus, textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* ------------------------------------------------------------------ auth */
+
+.centered {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.75rem;
+}
+
+.auth {
+  width: min(380px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.auth h1 { margin: 0; font-size: 1.6rem; }
+.auth .subtitle { margin: 0 0 1rem; color: var(--muted); font-size: 0.86rem; }
+.auth label { font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; }
+.auth .primary { margin-top: 1.1rem; }
+
+.tabs { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+.tabs button { flex: 1; }
+.tabs button.active { border-color: var(--accent); color: var(--accent); }
+
+.error { color: var(--error); font-size: 0.85rem; margin: 0.6rem 0 0; }
+
+/* ---------------------------------------------------------------- layout */
+
+.layout { display: flex; flex-direction: column; height: 100vh; }
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.spacer { flex: 1; }
+.user { color: var(--muted); font-size: 0.9rem; }
+
+.body { display: flex; flex: 1; min-height: 0; }
+
+/* --------------------------------------------------------------- sidebar */
+
+.sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  padding: 1rem;
+  overflow-y: auto;
+  background: var(--panel);
+}
+
+.sidebar h2 { margin: 0 0 0.75rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.sidebar ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.sidebar li.empty { color: var(--muted); font-size: 0.85rem; padding: 0.5rem 0; }
+
+.sidebar li button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+}
+
+.sidebar li button.active { background: var(--panel-raised); border-color: var(--accent); }
+.doc-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+.new-document { display: flex; gap: 0.4rem; margin-bottom: 0.9rem; }
+.new-document input { flex: 1; min-width: 0; }
+
+/* ---------------------------------------------------------------- editor */
+
+.editor { flex: 1; display: flex; flex-direction: column; padding: 1rem; min-width: 0; }
+.placeholder { color: var(--muted); margin: auto; }
+
+.editor-header { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.75rem; }
+.editor-header h2 { margin: 0; font-size: 1.15rem; }
+.version { font-size: 0.78rem; color: var(--muted); }
+.participants { font-size: 0.78rem; color: var(--muted); }
+
+.editor textarea {
+  flex: 1;
+  resize: none;
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Code", Menlo, Consolas, monospace;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  padding: 1rem;
+}
+
+.status {
+  margin-top: 0.7rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.83rem;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+}
+
+.status.saving { border-color: var(--warn); color: var(--warn); }
+.status.saved { border-color: var(--ok); color: var(--ok); }
+.status.remote { border-color: var(--remote); color: var(--remote); }
+.status.conflict { border-color: var(--warn); color: var(--warn); }
+.status.error { border-color: var(--error); color: var(--error); }
+
+@media (max-width: 720px) {
+  .body { flex-direction: column; }
+  .sidebar { width: 100%; max-height: 190px; border-right: none; border-bottom: 1px solid var(--border); }
+}

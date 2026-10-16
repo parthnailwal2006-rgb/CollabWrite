@@ -1,16 +1,75 @@
 {
+  "root": true,
   "env": {
     "node": true,
-    "es2021": true,
-    "jest": true
+    "es2022": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "script"
   },
   "extends": "eslint:recommended",
-  "parserOptions": {
-    "ecmaVersion": 12,
-    "sourceType": "module"
-  },
   "rules": {
-    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
-    "no-console": "off"
-  }
+    "no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_"
+      }
+    ],
+    "no-console": "off",
+    "eqeqeq": [
+      "warn",
+      "smart"
+    ],
+    "prefer-const": "warn"
+  },
+  "overrides": [
+    {
+      "files": [
+        "tests/**/*.js"
+      ],
+      "env": {
+        "jest": true
+      }
+    },
+    {
+      "files": [
+        "vite.config.js"
+      ],
+      "env": {
+        "node": true
+      },
+      "parserOptions": {
+        "sourceType": "module"
+      }
+    },
+    {
+      "files": [
+        "src/client/**/*.{js,jsx}"
+      ],
+      "env": {
+        "browser": true,
+        "node": false
+      },
+      "plugins": [
+        "react"
+      ],
+      "parserOptions": {
+        "sourceType": "module",
+        "ecmaFeatures": {
+          "jsx": true
+        }
+      },
+      "rules": {
+        "react/jsx-uses-vars": "error",
+        "react/jsx-uses-react": "error"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "dist/",
+    "node_modules/",
+    "coverage/",
+    "data/"
+  ]
 }

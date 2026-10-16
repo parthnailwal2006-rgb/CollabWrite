@@ -6,9 +6,84 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+env:
+  NODE_VERSION: '26'
+
 jobs:
-  lint-and-test:
-    name: Lint, Unit & Property Tests
+  # ===========================================================================
+  # Lint, unit tests and integration tests.
+  #
+  # The suite runs against the in-memory support store, so PostgreSQL is not
+  # required here. The schema is validated in its own job instead, where a
+  # failure points at the SQL rather than at a test.
+  # ===========================================================================
+  test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Linter
+        run: npm run lint
+
+      - name: Run Test Suite with Coverage
+        env:
+          NODE_ENV: test
+          LOG_LEVEL: error
+          JWT_SECRET: test_jwt_secret_key_1234567890
+        run: npm run test:coverage
+
+      - name: Upload Coverage Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  # ===========================================================================
+  # The academic demos double as end-to-end smoke tests: each one asserts its
+  # own outcome and exits non-zero if the engine failed to demonstrate it.
+  # ===========================================================================
+  demos:
+    name: Evaluation Demos
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run All Evaluation Demos
+        env:
+          LOG_LEVEL: warn
+        run: npm run demo
+
+  # ===========================================================================
+  # Applies the PostgreSQL support schema and the seed data against a real
+  # server, with ON_ERROR_STOP so a broken statement fails the job.
+  # ===========================================================================
+  schema:
+    name: Validate PostgreSQL Schema
     runs-on: ubuntu-latest
 
     services:
@@ -26,15 +101,54 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Install PostgreSQL Client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client
+
+      - name: Apply Schema and Seed Data
+        env:
+          PGPASSWORD: collabpassword
+        run: |
+          psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U collabuser -d collabwrite_test -f database/init.sql
+          psql -v ON_ERROR_STOP=1 -h localhost -p 5432 -U collabuser -d collabwrite_test -f database/seeds/001_sample_data.sql
+
+      - name: Assert the PostgreSQL Boundary Is Respected
+        env:
+          PGPASSWORD: collabpassword
+        run: |
+          # rules.md section 8 and architecture.md section 7 keep document
+          # content, versions, change logs, locks and indexes out of
+          # PostgreSQL. This check fails the build if one creeps back in.
+          FORBIDDEN=$(psql -t -A -h localhost -p 5432 -U collabuser -d collabwrite_test -c \
+            "SELECT string_agg(table_name, ', ') FROM information_schema.tables
+             WHERE table_schema = 'public'
+               AND table_name IN ('document_versions','change_logs','document_locks','document_content');")
+          if [ -n "$FORBIDDEN" ]; then
+            echo "Engine-owned tables found in PostgreSQL: $FORBIDDEN"
+            exit 1
+          fi
+
+          CONTENT_COLUMN=$(psql -t -A -h localhost -p 5432 -U collabuser -d collabwrite_test -c \
+            "SELECT count(*) FROM information_schema.columns
+             WHERE table_name = 'documents' AND column_name IN ('content','body','text');")
+          if [ "$CONTENT_COLUMN" != "0" ]; then
+            echo "The documents table must not store content; that belongs to the engine."
+            exit 1
+          fi
+
+          echo "PostgreSQL boundary verified: support data only."
+
+  # ===========================================================================
+  # The React presentation layer must still build.
+  # ===========================================================================
+  client:
+    name: Build React Client
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
@@ -43,42 +157,22 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       - name: Install Dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Install PostgreSQL Client
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y postgresql-client
+      - name: Build Client Bundle
+        run: npm run client:build
 
-      - name: Initialize Database Schema & Seed Data
-        env:
-          PGPASSWORD: collabpassword
-        run: |
-          psql -h localhost -p 5432 -U collabuser -d collabwrite_test -f database/init.sql
-          psql -h localhost -p 5432 -U collabuser -d collabwrite_test -f database/seeds/001_sample_data.sql
-
-      - name: Run Linter
-        run: npm run lint
-
-      - name: Run Test Suite
-        env:
-          NODE_ENV: test
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_NAME: collabwrite_test
-          DB_USER: collabuser
-          DB_PASSWORD: collabpassword
-          REDIS_HOST: localhost
-          REDIS_PORT: 6379
-          JWT_SECRET: test_jwt_secret_key_1234567890
-        run: npm test
-
-  docker-build:
+  # ===========================================================================
+  # Docker composition sanity check.
+  # ===========================================================================
+  docker:
     name: Verify Docker Compose Configuration
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
