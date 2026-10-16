@@ -160,14 +160,16 @@ function DocumentList({ documents, activeId, onOpen, onCreate, onRefresh }) {
 function InspectorModal({ token, onClose }) {
   const [tab, setTab] = useState('purvansh');
   const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
       const res = await api('/api/engine/inspector', { token });
       setData(res);
-    } catch {
-      // ignore
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'Route not found');
     }
   }, [token]);
 
@@ -267,6 +269,11 @@ function InspectorModal({ token, onClose }) {
         </div>
 
         <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1 }}>
+          {error && (
+            <div style={{ background: '#7f1d1d', border: '1px solid #ef4444', color: '#fecaca', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.82rem' }}>
+              ⚠️ <strong>Backend Restart Required:</strong> The backend server process needs to be restarted to load the new Inspector route. Please stop the backend server (<code>Ctrl+C</code>) in your terminal and run <code>npm start</code> again.
+            </div>
+          )}
           {tab === 'purvansh' && (
             <div>
               <div style={{ background: '#1e3a5f', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.82rem', color: '#bfdbfe' }}>
