@@ -6,6 +6,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [Unreleased] - 2026-10-16
+
+### Added
+- **engine**: implement the Academic Engine per prd/architecture/design/phases/rules ([30691dc])
+- **ci**: configure CodeQL security analysis, Dependabot updates, and automated changelog generation ([99fed93])
+- **repo**: initialize CollabWrite repository with complete production documentation, database schema, and CI/CD templates ([c6c3cd3])
+
+### Fixed
+- **security**: address CodeQL findings on the new engine and API code ([13de75e])
+- **ci**: provide service implementations, Jest test harnesses, ESLint config, and robust CI workflow steps ([cb3e5d9])
+
+### Documentation
+- **changelog**: auto-update CHANGELOG.md based on conventional commits [skip ci] ([21adb9b])
+- add core academic architecture, design, and roadmap specifications ([d0ae5d2])
+- **changelog**: auto-update CHANGELOG.md based on conventional commits [skip ci] ([d1bd4eb])
+- **changelog**: auto-update CHANGELOG.md based on conventional commits [skip ci] ([d1aadf1])
+- **changelog**: auto-update CHANGELOG.md based on conventional commits [skip ci] ([31210a0])
+- **changelog**: auto-update CHANGELOG.md based on conventional commits [skip ci] ([654f812])
+- **changelog**: auto-update CHANGELOG.md based on conventional commits [skip ci] ([b2d7120])
+- **changelog**: auto-update CHANGELOG.md based on conventional commits [skip ci] ([3bc6d46])
+- **style**: standardize professional enterprise formatting and eliminate emoji glyphs across all documentation ([7a407d1])
+
+## [Unreleased] - 2026-10-13
+
+### Added
+- **ci**: configure CodeQL security analysis, Dependabot updates, and automated changelog generation ([99fed93])
+- **repo**: initialize CollabWrite repository with complete production documentation, database schema, and CI/CD templates ([c6c3cd3])
+
+### Fixed
+- **ci**: provide service implementations, Jest test harnesses, ESLint config, and robust CI workflow steps ([cb3e5d9])
+
+### Documentation
+- add core academic architecture, design, and roadmap specifications ([d0ae5d2])
+- **changelog**: auto-update CHANGELOG.md based on conventional commits [skip ci] ([d1bd4eb])
+- **changelog**: auto-update CHANGELOG.md based on conventional commits [skip ci] ([d1aadf1])
+- **changelog**: auto-update CHANGELOG.md based on conventional commits [skip ci] ([31210a0])
+- **changelog**: auto-update CHANGELOG.md based on conventional commits [skip ci] ([654f812])
+- **changelog**: auto-update CHANGELOG.md based on conventional commits [skip ci] ([b2d7120])
+- **changelog**: auto-update CHANGELOG.md based on conventional commits [skip ci] ([3bc6d46])
+- **style**: standardize professional enterprise formatting and eliminate emoji glyphs across all documentation ([7a407d1])
+
 ## [Unreleased] - 2026-08-31
 
 ### Added
