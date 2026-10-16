@@ -222,6 +222,7 @@ function InspectorModal({ token, onClose }) {
   const collab = s?.collaboration;
   const conflicts = s?.conflicts;
   const recovery = s?.recovery;
+  const locks = s?.locks;
 
   return (
     <div style={{
@@ -351,26 +352,30 @@ function InspectorModal({ token, onClose }) {
                   ⚡ Simulate Deadlock Cycle
                 </button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
-                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Transactions Begun</span>
-                  <h3 style={{ margin: '0.3rem 0 0', color: '#38bdf8' }}>{tx?.begun || 0}</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.65rem', marginBottom: '1rem' }}>
+                <div style={{ background: '#1f2937', padding: '0.65rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>Tx Begun</span>
+                  <h3 style={{ margin: '0.25rem 0 0', color: '#38bdf8' }}>{tx?.begun || 0}</h3>
                 </div>
-                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Committed (Atomic)</span>
-                  <h3 style={{ margin: '0.3rem 0 0', color: '#10b981' }}>{tx?.committed || 0}</h3>
+                <div style={{ background: '#1f2937', padding: '0.65rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>Committed</span>
+                  <h3 style={{ margin: '0.25rem 0 0', color: '#10b981' }}>{tx?.committed || 0}</h3>
                 </div>
-                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Deadlock Sweeps</span>
-                  <h3 style={{ margin: '0.3rem 0 0', color: '#f59e0b' }}>{deadlocks?.sweeps || 0}</h3>
+                <div style={{ background: '#1f2937', padding: '0.65rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>Total Aborted</span>
+                  <h3 style={{ margin: '0.25rem 0 0', color: '#f87171' }}>{tx?.aborted || 0}</h3>
                 </div>
-                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Deadlocks Found</span>
-                  <h3 style={{ margin: '0.3rem 0 0', color: (deadlocks?.deadlocksDetected || 0) > 0 ? '#f87171' : '#9ca3af' }}>{deadlocks?.deadlocksDetected || 0}</h3>
+                <div style={{ background: '#1f2937', padding: '0.65rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>Locks Granted</span>
+                  <h3 style={{ margin: '0.25rem 0 0', color: '#c084fc' }}>{locks?.granted || 0}</h3>
                 </div>
-                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Victims Aborted</span>
-                  <h3 style={{ margin: '0.3rem 0 0', color: '#ef4444' }}>{deadlocks?.victimsAborted || 0}</h3>
+                <div style={{ background: '#1f2937', padding: '0.65rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>Deadlocks</span>
+                  <h3 style={{ margin: '0.25rem 0 0', color: (deadlocks?.deadlocksDetected || 0) > 0 ? '#f87171' : '#9ca3af' }}>{deadlocks?.deadlocksDetected || 0}</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.65rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#9ca3af' }}>Deadlock Victims</span>
+                  <h3 style={{ margin: '0.25rem 0 0', color: '#ef4444' }}>{deadlocks?.victimsAborted || 0}</h3>
                 </div>
               </div>
 
@@ -382,7 +387,7 @@ function InspectorModal({ token, onClose }) {
                     <span style={{ fontSize: '0.72rem', background: '#1e3a8a', color: '#93c5fd', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>Guaranteed</span>
                   </div>
                   <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: '#d1d5db' }}>
-                    <strong>{tx?.committed || 0}</strong> committed / <strong>{tx?.aborted || 0}</strong> aborted. Aborted transactions restore WAL Before-Images with <strong>0 dirty bytes</strong> left on disk.
+                    <strong>{tx?.committed || 0}</strong> committed / <strong>{tx?.aborted || 0}</strong> total rollbacks (including <strong>{deadlocks?.victimsAborted || 0}</strong> deadlock victims). Restores WAL Before-Images with <strong>0 dirty bytes</strong> left on disk.
                   </p>
                 </div>
                 <div style={{ background: '#18181b', padding: '0.75rem', borderRadius: '6px', border: '1px solid #059669' }}>
@@ -400,7 +405,7 @@ function InspectorModal({ token, onClose }) {
                     <span style={{ fontSize: '0.72rem', background: '#581c87', color: '#e9d5ff', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>Strict 2PL Active</span>
                   </div>
                   <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: '#d1d5db' }}>
-                    <strong>{lockTable.length}</strong> active locks held (Shared/Exclusive). <strong>{wfg.length}</strong> queued waiters. Locks released strictly at commit/abort.
+                    <strong>{locks?.granted || 0}</strong> total locks granted ({locks?.waited || 0} waited). <strong>{lockTable.length}</strong> currently active. (Strict 2PL releases locks in ~4ms at commit/abort).
                   </p>
                 </div>
                 <div style={{ background: '#18181b', padding: '0.75rem', borderRadius: '6px', border: '1px solid #d97706' }}>

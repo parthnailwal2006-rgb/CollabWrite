@@ -207,16 +207,25 @@ function createApp({ store, engine }) {
 
       const [resA, resB] = await Promise.all([outcomeA, outcomeB]);
 
-      // Cleanup
-      try {
-        await manager.abort(txA, 'deadlock-simulation-cleanup');
-      } catch (_err) {
-        // Transaction may already be aborted by deadlock detector
+      // Complete the survivor transaction and clean up victim
+      if (resA === 'ACQUIRED') {
+        try {
+          await manager.commit(txA);
+        } catch (_err) {
+          try { await manager.abort(txA, 'deadlock-cleanup'); } catch (_e) { /* ignore */ }
+        }
+      } else {
+        try { await manager.abort(txA, 'deadlock-victim-cleanup'); } catch (_err) { /* ignore */ }
       }
-      try {
-        await manager.abort(txB, 'deadlock-simulation-cleanup');
-      } catch (_err) {
-        // Transaction may already be aborted by deadlock detector
+
+      if (resB === 'ACQUIRED') {
+        try {
+          await manager.commit(txB);
+        } catch (_err) {
+          try { await manager.abort(txB, 'deadlock-cleanup'); } catch (_e) { /* ignore */ }
+        }
+      } else {
+        try { await manager.abort(txB, 'deadlock-victim-cleanup'); } catch (_err) { /* ignore */ }
       }
 
       res.json({
