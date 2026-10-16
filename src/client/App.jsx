@@ -406,11 +406,11 @@ function InspectorModal({ token, onClose }) {
                 </div>
                 <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
                   <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Scheduler Queue Depth</span>
-                  <h3 style={{ margin: '0.3rem 0 0', color: '#38bdf8' }}>{sched?.queueDepth || 0} pending</h3>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#38bdf8' }}>{sched?.queueLength ?? 0} in queue</h3>
                 </div>
                 <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Total Tasks Scheduled</span>
-                  <h3 style={{ margin: '0.3rem 0 0', color: '#10b981' }}>{sched?.totalScheduled || 0}</h3>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Tasks Dispatched</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#10b981' }}>{sched?.dispatched ?? sched?.totalScheduled ?? 0}</h3>
                 </div>
                 <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
                   <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Worker Pool</span>
@@ -428,11 +428,14 @@ function InspectorModal({ token, onClose }) {
 
               <h4 style={{ margin: '1rem 0 0.5rem', fontSize: '0.9rem', color: '#d1d5db' }}>Worker Threads (WorkerPool.js)</h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
-                {(sched?.workers || [1, 2, 3, 4]).map((w, idx) => (
+                {(sched?.workers || [{ id: 1, state: 'IDLE' }, { id: 2, state: 'IDLE' }, { id: 3, state: 'IDLE' }, { id: 4, state: 'IDLE' }]).map((w, idx) => (
                   <div key={idx} style={{ background: '#1f2937', padding: '0.6rem', borderRadius: '6px', border: '1px solid #374151', textAlign: 'center' }}>
                     <div style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Worker {w.id || (idx + 1)}</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: w.busy ? '#f59e0b' : '#10b981', marginTop: '0.2rem' }}>
-                      ● {w.busy ? 'BUSY' : 'IDLE'}
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: w.state === 'BUSY' ? '#f59e0b' : '#10b981', marginTop: '0.2rem' }}>
+                      ● {w.state || 'IDLE'}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#9ca3af', marginTop: '0.25rem' }}>
+                      {w.tasksProcessed || 0} tasks done
                     </div>
                   </div>
                 ))}
