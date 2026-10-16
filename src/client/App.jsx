@@ -211,6 +211,11 @@ export default function App() {
     const result = await api(`/api/documents/${docId}`, { token });
     const document = result.document;
 
+    // Leave previous document room so presence stays accurate per document
+    if (activeRef.current && activeRef.current.id !== docId && socketRef.current) {
+      socketRef.current.emit('document:leave', { docId: activeRef.current.id });
+    }
+
     committedRef.current = { text: document.text, version: document.version };
     setActive(document);
     setText(document.text);
@@ -226,8 +231,15 @@ export default function App() {
     const socket = io(SOCKET_URL, { auth: { token: session.token }, transports: ['websocket'] });
     socketRef.current = socket;
 
-    socket.on('document:joined', (event) => setParticipants(event.participants || []));
-    socket.on('presence', (event) => setParticipants(event.participants || []));
+    socket.on('document:joined', (event) => {
+      if (activeRef.current && event.docId === activeRef.current.id) {
+        setParticipants(event.participants || []);
+      }
+    });
+    socket.on('presence', (event) => {
+      if (!activeRef.current || (event.docId && event.docId !== activeRef.current.id)) return;
+      setParticipants(event.participants || []);
+    });
 
     socket.on('edit', (event) => {
       const current = activeRef.current;
@@ -378,8 +390,9 @@ export default function App() {
                   </button>
                 )}
                 <span className="spacer" />
-                <span className="participants">
-                  {participants.length} online: {participants.map((p) => p.username).join(', ') || '-'}
+                <span className="participants" title="Active collaborators inside this document">
+                  <span style={{ color: '#10b981', marginRight: '0.35rem' }}>●</span>
+                  {participants.length} active in document: {participants.map((p) => p.username).join(', ') || '-'}
                 </span>
               </div>
 
