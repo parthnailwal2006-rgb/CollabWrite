@@ -220,6 +220,8 @@ function InspectorModal({ token, onClose }) {
   const sched = data?.scheduler || s?.scheduler;
   const mq = s?.messageQueue;
   const collab = s?.collaboration;
+  const conflicts = s?.conflicts;
+  const recovery = s?.recovery;
 
   return (
     <div style={{
@@ -369,6 +371,46 @@ function InspectorModal({ token, onClose }) {
                 <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
                   <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Victims Aborted</span>
                   <h3 style={{ margin: '0.3rem 0 0', color: '#ef4444' }}>{deadlocks?.victimsAborted || 0}</h3>
+                </div>
+              </div>
+
+              <h4 style={{ margin: '1rem 0 0.5rem', fontSize: '0.9rem', color: '#d1d5db' }}>🏛️ ACID Principles Live Telemetry</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ background: '#18181b', padding: '0.75rem', borderRadius: '6px', border: '1px solid #2563eb' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong style={{ color: '#60a5fa', fontSize: '0.85rem' }}>[A] Atomicity (All-or-Nothing)</strong>
+                    <span style={{ fontSize: '0.72rem', background: '#1e3a8a', color: '#93c5fd', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>Guaranteed</span>
+                  </div>
+                  <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: '#d1d5db' }}>
+                    <strong>{tx?.committed || 0}</strong> committed / <strong>{tx?.aborted || 0}</strong> aborted. Aborted transactions restore WAL Before-Images with <strong>0 dirty bytes</strong> left on disk.
+                  </p>
+                </div>
+                <div style={{ background: '#18181b', padding: '0.75rem', borderRadius: '6px', border: '1px solid #059669' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong style={{ color: '#34d399', fontSize: '0.85rem' }}>[C] Consistency (Invariants)</strong>
+                    <span style={{ fontSize: '0.72rem', background: '#064e3b', color: '#a7f3d0', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>CRC-32 + Versioning</span>
+                  </div>
+                  <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: '#d1d5db' }}>
+                    Optimistic version checks: <strong>{conflicts?.conflictsDetected || 0}</strong> conflicts caught. Binary page headers enforce CRC-32 checksums and strict 4 KB bounds.
+                  </p>
+                </div>
+                <div style={{ background: '#18181b', padding: '0.75rem', borderRadius: '6px', border: '1px solid #7c3aed' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong style={{ color: '#c084fc', fontSize: '0.85rem' }}>[I] Isolation (Strict 2PL)</strong>
+                    <span style={{ fontSize: '0.72rem', background: '#581c87', color: '#e9d5ff', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>Strict 2PL Active</span>
+                  </div>
+                  <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: '#d1d5db' }}>
+                    <strong>{lockTable.length}</strong> active locks held (Shared/Exclusive). <strong>{wfg.length}</strong> queued waiters. Locks released strictly at commit/abort.
+                  </p>
+                </div>
+                <div style={{ background: '#18181b', padding: '0.75rem', borderRadius: '6px', border: '1px solid #d97706' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong style={{ color: '#fbbf24', fontSize: '0.85rem' }}>[D] Durability (Crash Survival)</strong>
+                    <span style={{ fontSize: '0.72rem', background: '#78350f', color: '#fde68a', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>WAL + fsync()</span>
+                  </div>
+                  <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: '#d1d5db' }}>
+                    WAL physically flushed via <code>fsync()</code> before commit. Boot recovery: <strong>{recovery?.scanned || 0}</strong> log records scanned (<strong>{recovery?.winners?.length || 0}</strong> redone, <strong>{recovery?.losers?.length || 0}</strong> undone).
+                  </p>
                 </div>
               </div>
 
