@@ -27,8 +27,14 @@ class InMemoryStore {
     this.nextDocumentId = 1;
   }
 
-  /* eslint-disable-next-line class-methods-use-this */
   async init() {
+    if (process.env.NODE_ENV !== 'test' && this.users.size === 0) {
+      // Default bcrypt hash for 'password123'
+      const hash = '$2b$10$wAjp5sJ9UEIk2yxivko9O.3.lBxW/TfDSe3RHRYy3USUjcpbhXJpW';
+      await this.createUser({ username: 'ananya', email: 'ananya@collabwrite.dev', passwordHash: hash, role: 'admin' });
+      await this.createUser({ username: 'rahul', email: 'rahul@collabwrite.dev', passwordHash: hash, role: 'user' });
+      await this.createUser({ username: 'priya', email: 'priya@collabwrite.dev', passwordHash: hash, role: 'user' });
+    }
     return this;
   }
 
