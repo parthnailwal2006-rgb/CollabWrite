@@ -103,12 +103,24 @@ function AuthPanel({ onAuthenticated }) {
   );
 }
 
-function DocumentList({ documents, activeId, onOpen, onCreate }) {
+function DocumentList({ documents, activeId, onOpen, onCreate, onRefresh }) {
   const [title, setTitle] = useState('');
 
   return (
     <aside className="sidebar">
-      <h2>Documents</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+        <h2 style={{ margin: 0 }}>Documents</h2>
+        {onRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            title="Refresh document list"
+            style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}
+          >
+            ↻
+          </button>
+        )}
+      </div>
       <form
         className="new-document"
         onSubmit={(event) => {
@@ -146,7 +158,28 @@ function DocumentList({ documents, activeId, onOpen, onCreate }) {
 }
 
 export default function App() {
-  const [session, setSession] = useState(null);
+  const [session, setSessionState] = useState(() => {
+    try {
+      const saved = localStorage.getItem('collabwrite_session');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const setSession = useCallback((newSession) => {
+    setSessionState(newSession);
+    try {
+      if (newSession) {
+        localStorage.setItem('collabwrite_session', JSON.stringify(newSession));
+      } else {
+        localStorage.removeItem('collabwrite_session');
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
+
   const [documents, setDocuments] = useState([]);
   const [active, setActive] = useState(null);
   const [text, setText] = useState('');
@@ -313,6 +346,7 @@ export default function App() {
           documents={documents}
           activeId={active ? active.id : null}
           onOpen={(id) => openDocument(id).catch((error) => setStatus({ kind: 'error', message: error.message }))}
+          onRefresh={() => refreshDocuments(session.token).catch((error) => setStatus({ kind: 'error', message: error.message }))}
           onCreate={async (title) => {
             try {
               const created = await api('/api/documents', {
