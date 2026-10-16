@@ -277,7 +277,7 @@ function InspectorModal({ token, onClose }) {
           {tab === 'purvansh' && (
             <div>
               <div style={{ background: '#1e3a5f', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.82rem', color: '#bfdbfe' }}>
-                💡 <strong>Purvansh:</strong> Documents are stored in fixed 4 KB binary pages inside <code>documents.dat</code>. The Buffer Pool acts like a 64-page study desk in RAM, using LRU eviction and frame pinning (paperweights) during disk I/O.
+                💡 <strong>Purvansh:</strong> Documents are stored in fixed 4 KB binary pages inside <code>documents.dat</code>. The Buffer Pool acts like an 8-page study desk in RAM (8 frames ~ 32 KiB), using LRU eviction and frame pinning (paperweights) during disk I/O.
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
                 <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
