@@ -19,6 +19,7 @@ const { createEditController } = require('./controllers/editController');
 const { createAdminController, requireAdmin } = require('./controllers/adminController');
 const { requireAuth, requireDocumentAccess, requireOwner, HttpError } = require('./middleware/auth');
 const { notFound, errorHandler, asyncHandler } = require('./middleware/errors');
+const { LOCK_MODES } = require('../engine/lock/LockManager');
 
 /**
  * @param {object} deps
@@ -166,6 +167,64 @@ function createApp({ store, engine }) {
         throw new HttpError(400, error.message, 'INVALID_POLICY');
       }
       res.json({ policy: engine.scheduler.policy });
+    })
+  );
+  app.post(
+    '/api/engine/deadlock/simulate',
+    requireAuth,
+    asyncHandler(async (_req, res) => {
+      let pageA = 4;
+      let pageB = 5;
+      try {
+        if (engine.storage && typeof engine.storage.getDocumentPages === 'function') {
+          const p1 = engine.storage.getDocumentPages(1);
+          const p2 = engine.storage.getDocumentPages(2);
+          if (p1 && p1.length > 0) pageA = p1[0];
+          if (p2 && p2.length > 0) pageB = p2[0];
+        }
+      } catch {
+        // Fallback to default pages
+      }
+
+      const manager = engine.transactionManager;
+      const txA = manager.begin({ label: 'T-Sim-A' });
+      const txB = manager.begin({ label: 'T-Sim-B' });
+
+      // Step 1: Each transaction takes its first lock on different pages
+      await manager.acquireLock(txA, 1, pageA, LOCK_MODES.EXCLUSIVE);
+      await manager.acquireLock(txB, 2, pageB, LOCK_MODES.EXCLUSIVE);
+
+      // Step 2: Each mutually requests the lock held by the other -> Circular Wait
+      const outcomeA = manager.acquireLock(txA, 2, pageB, LOCK_MODES.EXCLUSIVE)
+        .then(() => 'ACQUIRED', (e) => e.name);
+      const outcomeB = manager.acquireLock(txB, 1, pageA, LOCK_MODES.EXCLUSIVE)
+        .then(() => 'ACQUIRED', (e) => e.name);
+
+      // Step 3: Trigger DeadlockDetector sweep with Tarjan's SCC
+      if (engine.deadlockDetector) {
+        engine.deadlockDetector.detect();
+      }
+
+      const [resA, resB] = await Promise.all([outcomeA, outcomeB]);
+
+      // Cleanup
+      try {
+        await manager.abort(txA, 'deadlock-simulation-cleanup');
+      } catch (_err) {
+        // Transaction may already be aborted by deadlock detector
+      }
+      try {
+        await manager.abort(txB, 'deadlock-simulation-cleanup');
+      } catch (_err) {
+        // Transaction may already be aborted by deadlock detector
+      }
+
+      res.json({
+        success: true,
+        deadlocks: engine.deadlockDetector ? engine.deadlockDetector.getStats() : {},
+        outcomes: { txA: resA, txB: resB },
+        pages: { pageA, pageB }
+      });
     })
   );
 

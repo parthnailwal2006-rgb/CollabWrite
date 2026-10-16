@@ -195,6 +195,21 @@ function InspectorModal({ token, onClose }) {
     }
   };
 
+  const simulateDeadlock = async () => {
+    setBusy(true);
+    try {
+      await api('/api/engine/deadlock/simulate', {
+        token,
+        method: 'POST'
+      });
+      await loadData();
+    } catch (err) {
+      setError(err.message || 'Failed to simulate deadlock');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const s = data?.stats;
   const storage = s?.storage;
   const bp = s?.bufferPool;
@@ -310,10 +325,31 @@ function InspectorModal({ token, onClose }) {
 
           {tab === 'parth' && (
             <div>
-              <div style={{ background: '#2e1065', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.82rem', color: '#e9d5ff' }}>
-                💡 <strong>Parth:</strong> Strict Two-Phase Locking (Shared S for readers, Exclusive X for writers). The Wait-For Graph maps queued transactions, and Tarjan's SCC cycle detector preempts the youngest victim.
+              <div style={{ background: '#2e1065', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.82rem', color: '#e9d5ff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+                <div>
+                  💡 <strong>Parth:</strong> Strict Two-Phase Locking (Shared S for readers, Exclusive X for writers). The Wait-For Graph maps queued transactions, and Tarjan's SCC cycle detector preempts the youngest victim.
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={simulateDeadlock}
+                  style={{
+                    background: '#dc2626',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0.45rem 0.85rem',
+                    fontWeight: 600,
+                    cursor: busy ? 'not-allowed' : 'pointer',
+                    fontSize: '0.78rem',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  ⚡ Simulate Deadlock Cycle
+                </button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
                 <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
                   <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Transactions Begun</span>
                   <h3 style={{ margin: '0.3rem 0 0', color: '#38bdf8' }}>{tx?.begun || 0}</h3>
@@ -324,13 +360,51 @@ function InspectorModal({ token, onClose }) {
                 </div>
                 <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
                   <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Deadlock Sweeps</span>
-                  <h3 style={{ margin: '0.3rem 0 0', color: '#f59e0b' }}>{deadlocks?.sweeps || 0} sweeps</h3>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#f59e0b' }}>{deadlocks?.sweeps || 0}</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Deadlocks Found</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: (deadlocks?.deadlocksDetected || 0) > 0 ? '#f87171' : '#9ca3af' }}>{deadlocks?.deadlocksDetected || 0}</h3>
                 </div>
                 <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
                   <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Victims Aborted</span>
                   <h3 style={{ margin: '0.3rem 0 0', color: '#ef4444' }}>{deadlocks?.victimsAborted || 0}</h3>
                 </div>
               </div>
+
+              {deadlocks?.history && deadlocks.history.length > 0 && (
+                <div style={{ marginBottom: '1rem', background: '#18181b', padding: '0.75rem', borderRadius: '6px', border: '1px solid #ef4444' }}>
+                  <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.85rem', color: '#fca5a5' }}>🚨 Deadlock Detection & Victim Abort History (Tarjan's SCC)</h4>
+                  <table style={{ width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#27272a', textAlign: 'left', color: '#d4d4d8' }}>
+                        <th style={{ padding: '0.3rem 0.5rem' }}>Deadlock Cycle</th>
+                        <th style={{ padding: '0.3rem 0.5rem' }}>Victim Chosen</th>
+                        <th style={{ padding: '0.3rem 0.5rem' }}>Action Taken</th>
+                        <th style={{ padding: '0.3rem 0.5rem' }}>Timestamp</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {deadlocks.history.slice(-5).reverse().map((h, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #3f3f46' }}>
+                          <td style={{ padding: '0.3rem 0.5rem', color: '#f87171', fontWeight: 600 }}>
+                            {h.cycle.map((id) => `tx${id}`).join(' ➔ ')} ➔ tx{h.cycle[0]}
+                          </td>
+                          <td style={{ padding: '0.3rem 0.5rem', color: '#fbbf24', fontWeight: 600 }}>
+                            tx{h.victim} (Youngest / Fewest Locks)
+                          </td>
+                          <td style={{ padding: '0.3rem 0.5rem', color: '#34d399' }}>
+                            Aborted with LockAbortedError (Survivor Unblocked)
+                          </td>
+                          <td style={{ padding: '0.3rem 0.5rem', color: '#a1a1aa' }}>
+                            {new Date(h.detectedAt).toLocaleTimeString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
               <h4 style={{ margin: '1rem 0 0.5rem', fontSize: '0.9rem', color: '#d1d5db' }}>Live Wait-For Graph (WFG)</h4>
               {wfg.length === 0 ? (
