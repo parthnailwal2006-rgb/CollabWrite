@@ -414,7 +414,7 @@ function InspectorModal({ token, onClose }) {
                     <span style={{ fontSize: '0.72rem', background: '#78350f', color: '#fde68a', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>WAL + fsync()</span>
                   </div>
                   <p style={{ margin: '0.3rem 0 0', fontSize: '0.78rem', color: '#d1d5db' }}>
-                    WAL physically flushed via <code>fsync()</code> before commit. Boot recovery: <strong>{recovery?.scanned || 0}</strong> log records scanned (<strong>{recovery?.winners?.length || 0}</strong> redone, <strong>{recovery?.losers?.length || 0}</strong> undone).
+                    WAL physically flushed via <code>fsync()</code> before commit. Boot recovery: <strong>{recovery?.scanned || 0}</strong> log records scanned.
                   </p>
                 </div>
               </div>
