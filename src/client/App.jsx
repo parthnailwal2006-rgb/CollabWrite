@@ -157,6 +157,287 @@ function DocumentList({ documents, activeId, onOpen, onCreate, onRefresh }) {
   );
 }
 
+function InspectorModal({ token, onClose }) {
+  const [tab, setTab] = useState('purvansh');
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      const res = await api('/api/engine/inspector', { token });
+      setData(res);
+    } catch {
+      // ignore
+    }
+  }, [token]);
+
+  useEffect(() => {
+    loadData();
+    const timer = setInterval(loadData, 1500);
+    return () => clearInterval(timer);
+  }, [loadData]);
+
+  const togglePolicy = async () => {
+    if (!data?.scheduler?.policy) return;
+    const nextPolicy = data.scheduler.policy === 'FIFO' ? 'ROUND_ROBIN' : 'FIFO';
+    setBusy(true);
+    try {
+      await api('/api/engine/scheduler/policy', {
+        token,
+        method: 'POST',
+        body: { policy: nextPolicy }
+      });
+      await loadData();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const s = data?.stats;
+  const storage = s?.storage;
+  const bp = s?.bufferPool;
+  const tx = s?.transactions;
+  const deadlocks = data?.deadlocks || s?.deadlock;
+  const wfg = data?.waitForGraph || [];
+  const lockTable = s?.lockTable || [];
+  const sched = data?.scheduler || s?.scheduler;
+  const mq = s?.messageQueue;
+  const collab = s?.collaboration;
+
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      background: 'rgba(0,0,0,0.75)', zIndex: 1000,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem'
+    }}>
+      <div style={{
+        background: '#111827', color: '#f3f4f6', borderRadius: '10px',
+        width: '100%', maxWidth: '820px', maxHeight: '88vh',
+        display: 'flex', flexDirection: 'column', border: '1px solid #374151',
+        boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)'
+      }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '1rem 1.25rem', borderBottom: '1px solid #374151'
+        }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#60a5fa' }}>⚙️ CollabWrite OS & DBMS Inspector</h2>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: '#9ca3af' }}>Live evaluation telemetry directly from the engine</p>
+          </div>
+          <button type="button" onClick={onClose} style={{
+            background: '#374151', color: '#fff', border: 'none', borderRadius: '6px',
+            padding: '0.35rem 0.75rem', cursor: 'pointer', fontSize: '0.85rem'
+          }}>✕ Close</button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem 1.25rem', borderBottom: '1px solid #374151', background: '#1f2937' }}>
+          <button
+            type="button"
+            onClick={() => setTab('purvansh')}
+            style={{
+              padding: '0.4rem 0.8rem', borderRadius: '6px', border: 'none', cursor: 'pointer',
+              background: tab === 'purvansh' ? '#2563eb' : 'transparent',
+              color: tab === 'purvansh' ? '#fff' : '#9ca3af', fontWeight: 600, fontSize: '0.85rem'
+            }}
+          >
+            📦 Purvansh: Storage & Buffer
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('parth')}
+            style={{
+              padding: '0.4rem 0.8rem', borderRadius: '6px', border: 'none', cursor: 'pointer',
+              background: tab === 'parth' ? '#2563eb' : 'transparent',
+              color: tab === 'parth' ? '#fff' : '#9ca3af', fontWeight: 600, fontSize: '0.85rem'
+            }}
+          >
+            🔒 Parth: Locks, Deadlocks & ACID
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab('vansh')}
+            style={{
+              padding: '0.4rem 0.8rem', borderRadius: '6px', border: 'none', cursor: 'pointer',
+              background: tab === 'vansh' ? '#2563eb' : 'transparent',
+              color: tab === 'vansh' ? '#fff' : '#9ca3af', fontWeight: 600, fontSize: '0.85rem'
+            }}
+          >
+            ⚡ Vansh: Scheduler & Workers
+          </button>
+        </div>
+
+        <div style={{ padding: '1.25rem', overflowY: 'auto', flex: 1 }}>
+          {tab === 'purvansh' && (
+            <div>
+              <div style={{ background: '#1e3a5f', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.82rem', color: '#bfdbfe' }}>
+                💡 <strong>Purvansh:</strong> Documents are stored in fixed 4 KB binary pages inside <code>documents.dat</code>. The Buffer Pool acts like a 64-page study desk in RAM, using LRU eviction and frame pinning (paperweights) during disk I/O.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Binary Page Size</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#10b981' }}>{storage?.pageSize || 4096} B (4 KB)</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Pages in documents.dat</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#38bdf8' }}>{storage?.pages || 0} pages</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Buffer Pool Capacity</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#f59e0b' }}>{bp?.capacity || 64} frames (RAM)</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Resident in Memory</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#a78bfa' }}>{bp?.resident || 0} frames</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Pinned Frames (Paperweight)</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: (bp?.pinned || 0) > 0 ? '#ef4444' : '#10b981' }}>{bp?.pinned || 0} active</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Cache Hit Ratio</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#10b981' }}>{bp ? ((bp.hitRatio || 0) * 100).toFixed(1) : 0}% ({bp?.hits || 0} hits / {bp?.misses || 0} misses)</h3>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {tab === 'parth' && (
+            <div>
+              <div style={{ background: '#2e1065', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.82rem', color: '#e9d5ff' }}>
+                💡 <strong>Parth:</strong> Strict Two-Phase Locking (Shared S for readers, Exclusive X for writers). The Wait-For Graph maps queued transactions, and Tarjan's SCC cycle detector preempts the youngest victim.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Transactions Begun</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#38bdf8' }}>{tx?.begun || 0}</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Committed (Atomic)</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#10b981' }}>{tx?.committed || 0}</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Deadlock Sweeps</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#f59e0b' }}>{deadlocks?.sweeps || 0} sweeps</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Victims Aborted</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#ef4444' }}>{deadlocks?.victimsAborted || 0}</h3>
+                </div>
+              </div>
+
+              <h4 style={{ margin: '1rem 0 0.5rem', fontSize: '0.9rem', color: '#d1d5db' }}>Live Wait-For Graph (WFG)</h4>
+              {wfg.length === 0 ? (
+                <p style={{ fontSize: '0.8rem', color: '#9ca3af', fontStyle: 'italic', margin: '0 0 1rem' }}>Zero wait contention currently. (No transactions blocked waiting for each other).</p>
+              ) : (
+                <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse', marginBottom: '1rem' }}>
+                  <thead>
+                    <tr style={{ background: '#374151', textAlign: 'left' }}>
+                      <th style={{ padding: '0.4rem 0.6rem' }}>Waiting Transaction</th>
+                      <th style={{ padding: '0.4rem 0.6rem' }}>Blocked By (Holder)</th>
+                      <th style={{ padding: '0.4rem 0.6rem' }}>Resource</th>
+                      <th style={{ padding: '0.4rem 0.6rem' }}>Requested Mode</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {wfg.map((edge, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #374151' }}>
+                        <td style={{ padding: '0.4rem 0.6rem', color: '#f87171' }}>tx{edge.waiter}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', color: '#38bdf8' }}>tx{edge.holder}</td>
+                        <td style={{ padding: '0.4rem 0.6rem' }}>{edge.resourceId}</td>
+                        <td style={{ padding: '0.4rem 0.6rem' }}>{edge.mode}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              <h4 style={{ margin: '1rem 0 0.5rem', fontSize: '0.9rem', color: '#d1d5db' }}>Lock Table Snapshot (Strict 2PL)</h4>
+              {lockTable.length === 0 ? (
+                <p style={{ fontSize: '0.8rem', color: '#9ca3af', fontStyle: 'italic', margin: 0 }}>All locks released (locks held strictly during active read/write operations).</p>
+              ) : (
+                <table style={{ width: '100%', fontSize: '0.8rem', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#374151', textAlign: 'left' }}>
+                      <th style={{ padding: '0.4rem 0.6rem' }}>Resource</th>
+                      <th style={{ padding: '0.4rem 0.6rem' }}>Holders</th>
+                      <th style={{ padding: '0.4rem 0.6rem' }}>Waiting Queue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lockTable.map((item, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #374151' }}>
+                        <td style={{ padding: '0.4rem 0.6rem' }}>{item.resourceId}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', color: '#10b981' }}>{item.holders.map((h) => `tx${h.txId} (${h.mode})`).join(', ') || 'none'}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', color: '#f87171' }}>{item.waiting.map((w) => `tx${w.txId} (${w.mode})`).join(', ') || 'none'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {tab === 'vansh' && (
+            <div>
+              <div style={{ background: '#064e3b', padding: '0.75rem', borderRadius: '6px', marginBottom: '1rem', fontSize: '0.82rem', color: '#a7f3d0' }}>
+                💡 <strong>Vansh:</strong> CPU Request Scheduler rotates turns fairly among documents. The Bounded Worker Pool (4 workers) prevents CPU thread exhaustion. Real-time message queue guarantees FIFO event broadcast.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Scheduler Policy</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.3rem' }}>
+                    <strong style={{ color: '#f59e0b', fontSize: '1rem' }}>{sched?.policy || 'FIFO'}</strong>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={togglePolicy}
+                      style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                      Toggle to {sched?.policy === 'FIFO' ? 'ROUND_ROBIN' : 'FIFO'}
+                    </button>
+                  </div>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Scheduler Queue Depth</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#38bdf8' }}>{sched?.queueDepth || 0} pending</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Total Tasks Scheduled</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#10b981' }}>{sched?.totalScheduled || 0}</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Worker Pool</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#a78bfa' }}>4 threads (bounded)</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Message Queue</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#38bdf8' }}>{mq?.published || 0} published / {mq?.consumed || 0} delivered</h3>
+                </div>
+                <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Collaboration Sessions</span>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#10b981' }}>{collab?.sessions || 0} active ({collab?.joins || 0} joins)</h3>
+                </div>
+              </div>
+
+              <h4 style={{ margin: '1rem 0 0.5rem', fontSize: '0.9rem', color: '#d1d5db' }}>Worker Threads (WorkerPool.js)</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.5rem' }}>
+                {(sched?.workers || [1, 2, 3, 4]).map((w, idx) => (
+                  <div key={idx} style={{ background: '#1f2937', padding: '0.6rem', borderRadius: '6px', border: '1px solid #374151', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Worker {w.id || (idx + 1)}</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: w.busy ? '#f59e0b' : '#10b981', marginTop: '0.2rem' }}>
+                      ● {w.busy ? 'BUSY' : 'IDLE'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [session, setSessionState] = useState(() => {
     try {
@@ -185,6 +466,7 @@ export default function App() {
   const [text, setText] = useState('');
   const [participants, setParticipants] = useState([]);
   const [status, setStatus] = useState({ kind: 'idle', message: 'Ready' });
+  const [showInspector, setShowInspector] = useState(false);
 
   const [sharingOpen, setSharingOpen] = useState(false);
   const [shareUsername, setShareUsername] = useState('');
@@ -349,6 +631,23 @@ export default function App() {
       <header className="topbar">
         <strong>CollabWrite</strong>
         <span className="spacer" />
+        <button
+          type="button"
+          onClick={() => setShowInspector(true)}
+          style={{
+            fontSize: '0.8rem',
+            padding: '0.35rem 0.75rem',
+            background: '#2563eb',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontWeight: 600,
+            marginRight: '0.75rem'
+          }}
+        >
+          ⚙️ OS & DBMS Inspector
+        </button>
         <span className="user">{session.user.username}</span>
         <button type="button" onClick={() => setSession(null)}>Sign out</button>
       </header>
@@ -426,6 +725,9 @@ export default function App() {
           )}
         </main>
       </div>
+      {showInspector && (
+        <InspectorModal token={session.token} onClose={() => setShowInspector(false)} />
+      )}
     </div>
   );
 }

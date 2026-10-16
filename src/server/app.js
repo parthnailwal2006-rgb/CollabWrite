@@ -17,7 +17,7 @@ const { createAuthController } = require('./controllers/authController');
 const { createDocumentController } = require('./controllers/documentController');
 const { createEditController } = require('./controllers/editController');
 const { createAdminController, requireAdmin } = require('./controllers/adminController');
-const { requireAuth, requireDocumentAccess, requireOwner } = require('./middleware/auth');
+const { requireAuth, requireDocumentAccess, requireOwner, HttpError } = require('./middleware/auth');
 const { notFound, errorHandler, asyncHandler } = require('./middleware/errors');
 
 /**
@@ -141,6 +141,33 @@ function createApp({ store, engine }) {
   app.post('/api/admin/scheduler/policy', requireAuth, requireAdmin, asyncHandler(admin.setPolicy));
   app.get('/api/admin/audit', requireAuth, requireAdmin, asyncHandler(admin.audit));
   app.post('/api/admin/checkpoint', requireAuth, requireAdmin, asyncHandler(admin.checkpoint));
+
+  // -------------------------------------------------------- inspector
+  app.get(
+    '/api/engine/inspector',
+    requireAuth,
+    asyncHandler(async (_req, res) => {
+      res.json({
+        stats: engine.getStats(),
+        waitForGraph: engine.lockManager.getWaitForEdges(),
+        deadlocks: engine.deadlockDetector.getStats(),
+        scheduler: engine.scheduler.getMetrics()
+      });
+    })
+  );
+  app.post(
+    '/api/engine/scheduler/policy',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const policy = String((req.body && req.body.policy) || '').toUpperCase();
+      try {
+        engine.scheduler.setPolicy(policy);
+      } catch (error) {
+        throw new HttpError(400, error.message, 'INVALID_POLICY');
+      }
+      res.json({ policy: engine.scheduler.policy });
+    })
+  );
 
   app.use(notFound);
   app.use(errorHandler);
