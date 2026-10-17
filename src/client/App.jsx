@@ -539,7 +539,7 @@ function InspectorModal({ token, onClose }) {
                 </div>
                 <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
                   <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Message Queue</span>
-                  <h3 style={{ margin: '0.3rem 0 0', color: '#38bdf8' }}>{mq?.published || 0} published / {mq?.consumed || 0} delivered</h3>
+                  <h3 style={{ margin: '0.3rem 0 0', color: '#38bdf8' }}>{mq?.published || 0} published / {mq?.delivered ?? mq?.consumed ?? 0} delivered</h3>
                 </div>
                 <div style={{ background: '#1f2937', padding: '0.75rem', borderRadius: '6px', border: '1px solid #374151' }}>
                   <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>Collaboration Sessions</span>
